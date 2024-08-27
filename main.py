@@ -60,7 +60,6 @@ def main():
     print("last_layer_fixed set to: {}".format(last_layer_fixed))
     print("subtractive_margin set to: {}".format(subtractive_margin))
     print("topk_k set to: {}".format(topk_k))
-    print("num_prototypes set to: {}".format(num_prototypes))
     print("incorrect_class_connection: {}".format(incorrect_class_connection))
     print("deformable_conv_hidden_channels: {}".format(deformable_conv_hidden_channels))
 
@@ -71,6 +70,8 @@ def main():
     print(os.environ['CUDA_VISIBLE_DEVICES'])
 
     from config import img_size, experiment_run, base_architecture, num_prototypes
+
+    print("num_prototypes set to: {}".format(num_prototypes))
 
     if 'resnet34' in base_architecture:
         prototype_shape = (num_prototypes, 512, 2, 2)
@@ -95,7 +96,7 @@ def main():
 
     base_architecture_type = re.match('^[a-z]*', base_architecture).group(0)
 
-    from config import train_dir, test_dir, train_push_dir
+    from config import train_dir, val_dir, train_push_dir
 
     model_dir = './saved_models/' + base_architecture + '/' + experiment_run + '/'
     makedir(model_dir)
@@ -151,7 +152,7 @@ def main():
         num_workers=8, pin_memory=False)
     # test set
     test_dataset = datasets.ImageFolder(
-        test_dir,
+        val_dir,
         transforms.Compose([
             transforms.Resize(size=(img_size, img_size)),
             transforms.ToTensor(),
@@ -234,7 +235,7 @@ def main():
 
     # train the model
     log('start training')
-
+    max_accu = 0
     for epoch in range(num_train_epochs):
         log('epoch: \t{0}'.format(epoch))
 
@@ -242,12 +243,12 @@ def main():
             tnt.warm_only(model=ppnet_multi, log=log, last_layer_fixed=last_layer_fixed)
             _ = tnt.train(model=ppnet_multi, dataloader=train_loader, optimizer=warm_optimizer,
                         class_specific=class_specific, coefs=coefs, log=log, subtractive_margin=subtractive_margin,
-                        use_ortho_loss=False)
+                        use_ortho_loss=False, wandb_logger=wandb_logger)
         elif epoch >= num_warm_epochs and epoch - num_warm_epochs < num_secondary_warm_epochs:
             tnt.warm_pre_offset(model=ppnet_multi, log=log, last_layer_fixed=last_layer_fixed)
             _ = tnt.train(model=ppnet_multi, dataloader=train_loader, optimizer=warm_pre_offset_optimizer,
                         class_specific=class_specific, coefs=coefs, log=log, subtractive_margin=subtractive_margin,
-                        use_ortho_loss=False)
+                        use_ortho_loss=False, wandb_logger=wandb_logger)
             if 'stanford_dogs' in train_dir:
                 warm_lr_scheduler.step()
         else:
@@ -256,13 +257,13 @@ def main():
             tnt.joint(model=ppnet_multi, log=log, last_layer_fixed=last_layer_fixed)
             _ = tnt.train(model=ppnet_multi, dataloader=train_loader, optimizer=joint_optimizer,
                         class_specific=class_specific, coefs=coefs, log=log, subtractive_margin=subtractive_margin,
-                        use_ortho_loss=True)
+                        use_ortho_loss=True, wandb_logger=wandb_logger)
             joint_lr_scheduler.step()
 
         accu = tnt.test(model=ppnet_multi, dataloader=test_loader,
-                        class_specific=class_specific, log=log, subtractive_margin=subtractive_margin)
+                        class_specific=class_specific, log=log, subtractive_margin=subtractive_margin, wandb_logger=wandb_logger)
         save.save_model_w_condition(model=ppnet, model_dir=model_dir, model_name=str(epoch) + 'nopush', accu=accu,
-                                    target_accu=0.70, log=log)
+                                    target_accu=max(max_accu, 0.5), log=log)
 
         if (epoch == push_start and push_start < 20) or (epoch >= push_start and epoch in push_epochs):
             push.push_prototypes(
@@ -272,16 +273,16 @@ def main():
                 preprocess_input_function=preprocess_input_function, # normalize if needed
                 prototype_layer_stride=1,
                 root_dir_for_saving_prototypes=img_dir, # if not None, prototypes will be saved here
-                epoch_number=epoch, # if not provided, prototypes saved previously will be overwritten
+                # epoch_number=epoch, # if not provided, prototypes saved previously will be overwritten
                 prototype_img_filename_prefix=prototype_img_filename_prefix,
                 prototype_self_act_filename_prefix=prototype_self_act_filename_prefix,
                 proto_bound_boxes_filename_prefix=proto_bound_boxes_filename_prefix,
                 save_prototype_class_identity=True,
                 log=log)
             accu = tnt.test(model=ppnet_multi, dataloader=test_loader,
-                            class_specific=class_specific, log=log)
+                            class_specific=class_specific, log=log, wandb_logger=wandb_logger)
             save.save_model_w_condition(model=ppnet, model_dir=model_dir, model_name=str(epoch) + 'push', accu=accu,
-                                        target_accu=0.70, log=log)
+                                        target_accu=max(max_accu, 0.5), log=log)
 
             if not last_layer_fixed:
                 tnt.last_only(model=ppnet_multi, log=log, last_layer_fixed=last_layer_fixed)
@@ -289,11 +290,11 @@ def main():
                     log('iteration: \t{0}'.format(i))
                     _ = tnt.train(model=ppnet_multi, dataloader=train_loader, optimizer=last_layer_optimizer,
                                 class_specific=class_specific, coefs=coefs, log=log, 
-                                subtractive_margin=subtractive_margin)
+                                subtractive_margin=subtractive_margin, wandb_logger=wandb_logger)
                     accu = tnt.test(model=ppnet_multi, dataloader=test_loader,
-                                    class_specific=class_specific, log=log)
+                                    class_specific=class_specific, log=log, wandb_logger=wandb_logger)
                     save.save_model_w_condition(model=ppnet, model_dir=model_dir, model_name=str(epoch) + '_' + str(i) + 'push', accu=accu,
-                                                target_accu=0.70, log=log)
+                                                target_accu=max(max_accu, 0.5), log=log)
     logclose()
 
 if __name__ == "__main__":

@@ -38,8 +38,9 @@ num_prototypes = num_classes * 10
 # Cropped set: train_cropped & test_cropped
 # Full set: train & test
 train_dir = data_path + 'train_balanced'
-test_dir = data_path + 'val/'
+val_dir = data_path + 'val/'
 train_push_dir = data_path + 'train_balanced/'
+test_dir = data_path + "test/"
 train_batch_size = 80
 test_batch_size = 100
 train_push_batch_size = 75

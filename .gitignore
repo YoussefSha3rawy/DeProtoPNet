@@ -345,3 +345,5 @@ pretrained_models
 scripts
 wandb
 saved_models
+saved_visualizations
+test_images
