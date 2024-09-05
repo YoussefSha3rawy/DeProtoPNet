@@ -11,10 +11,11 @@ import argparse
 import re
 
 from DeformableProtoPNet.helpers import makedir
-from DeformableProtoPNet import model, push, train_and_test as tnt, save
+from DeformableProtoPNet import model, push, save
 from DeformableProtoPNet.log import create_logger
 from DeformableProtoPNet.preprocess import mean, std, preprocess_input_function
 from logger import WandbLogger
+import train_and_test_modified as tnt
 
 """
 python3 main.py -gpuid='0, 1' \
@@ -98,14 +99,30 @@ def main():
 
     from config import train_dir, val_dir, train_push_dir
 
-    model_dir = './saved_models/' + base_architecture + '/' + experiment_run + '/'
+    runs_dir = './saved_models/' + base_architecture + '/'
+    makedir(runs_dir)
+
+    if not experiment_run:
+        latest_run = 0
+        for dir in os.listdir(runs_dir):
+            dir_path = os.path.join(runs_dir, dir)
+            if os.path.isdir(dir_path):
+                try:
+                    dir_int = int(dir)
+                    if dir_int > latest_run:
+                        latest_run = dir_int
+                except ValueError:
+                    continue
+
+        experiment_run = f'{latest_run + 1}'
+    model_dir = runs_dir + experiment_run + '/'
     makedir(model_dir)
     shutil.copy(src=os.path.join(os.getcwd(), __file__), dst=model_dir)
     shutil.copy(src=os.path.join(os.getcwd(), 'config.py'), dst=model_dir)
 
     log, logclose = create_logger(log_filename=os.path.join(model_dir, 'train.log'))
     wandb_logger = WandbLogger(
-            {'base_architecture': base_architecture, 'experiment_run': experiment_run}, logger_name='DeProtoPNet', project='FinalProject')
+            {'base_architecture': base_architecture, 'experiment_run': experiment_run, 'num_prototypes': num_prototypes}, logger_name='DeProtoPNet', project='FinalProject')
     img_dir = os.path.join(model_dir, 'img')
     makedir(img_dir)
     weight_matrix_filename = 'outputL_weights'
@@ -273,7 +290,7 @@ def main():
                 preprocess_input_function=preprocess_input_function, # normalize if needed
                 prototype_layer_stride=1,
                 root_dir_for_saving_prototypes=img_dir, # if not None, prototypes will be saved here
-                # epoch_number=epoch, # if not provided, prototypes saved previously will be overwritten
+                epoch_number=epoch, # if not provided, prototypes saved previously will be overwritten
                 prototype_img_filename_prefix=prototype_img_filename_prefix,
                 prototype_self_act_filename_prefix=prototype_self_act_filename_prefix,
                 proto_bound_boxes_filename_prefix=proto_bound_boxes_filename_prefix,

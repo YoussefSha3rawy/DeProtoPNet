@@ -46,8 +46,8 @@ def main():
     # load the model
     check_test_accu = True
 
-    load_model_dir = './saved_models/densenet121/2024-08-21_15-47-50/' #'./saved_models/vgg19/003/'
-    load_model_name = '97nopush0.9620.pth' #'10_18push0.7822.pth'
+    load_model_dir = './saved_models/densenet121/2/' #'./saved_models/vgg19/003/'
+    load_model_name = '80push0.9660.pth' #'10_18push0.7822.pth'
 
     model_base_architecture = load_model_dir.split('/')[2]
     experiment_run = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -57,7 +57,7 @@ def main():
 
     log, logclose = create_logger(log_filename=os.path.join(root_save_analysis_path, 'local_analysis.log'))
     wandb_logger = WandbLogger(
-        {}, logger_name='DeProtoPNet_Test', project='FinalProject', mode='offline')
+        {}, logger_name='DeProtoPNet_Test', project='FinalProject')
 
     load_model_path = os.path.join(load_model_dir, load_model_name)
     epoch_number_str = re.search(r'\d+', load_model_name).group(0)
@@ -69,6 +69,7 @@ def main():
     log('load model from ' + load_model_path)
     log('model base architecture: ' + model_base_architecture)
     log('experiment run: ' + experiment_run)
+    log('epoch number: ' + str(start_epoch_number))
 
     ppnet = torch.load(load_model_path)
     ppnet = ppnet.cuda()
@@ -109,7 +110,7 @@ def main():
     # confirm prototype class identity
     load_img_dir = os.path.join(load_model_dir, 'img')
 
-    prototype_info = np.load(os.path.join(load_img_dir, 'bbNone'+'.npy'))
+    prototype_info = np.load(os.path.join(load_img_dir, 'epoch-'+epoch_number_str, 'bb'+epoch_number_str+'.npy'))
     prototype_img_identity = prototype_info[:, -1]
 
     log('Prototypes are chosen from ' + str(len(set(prototype_img_identity))) + ' number of classes.')

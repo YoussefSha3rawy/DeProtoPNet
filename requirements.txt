@@ -3,5 +3,6 @@ numpy
 opencv-python
 pandas
 pillow
+torchsummary
 tqdm
 wandb

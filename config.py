@@ -1,8 +1,7 @@
 base_architecture = 'densenet121'
 img_size = 224
 
-import datetime
-experiment_run = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+experiment_run = None
 
 import socket
 hostname = socket.gethostname()
@@ -33,14 +32,14 @@ elif 'JustRAIGS' in data_path:
 else:
     num_classes = 200
 
-num_prototypes = num_classes * 10
+num_prototypes = num_classes * 100
 
 # Cropped set: train_cropped & test_cropped
 # Full set: train & test
 train_dir = data_path + 'train_balanced'
 val_dir = data_path + 'val/'
 train_push_dir = data_path + 'train_balanced/'
-test_dir = data_path + "test/"
+test_dir = data_path + "test_upsampled/"
 train_batch_size = 80
 test_batch_size = 100
 train_push_batch_size = 75
